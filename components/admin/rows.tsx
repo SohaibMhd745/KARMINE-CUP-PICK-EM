@@ -11,6 +11,7 @@ import {
 import type { AliasSuggestion } from "@/lib/alias";
 import { CHAMPIONS } from "@/lib/champions";
 import { formatDateTime } from "@/lib/lock";
+import TeamLogo from "@/components/TeamLogo";
 import type {
   LegacyScore,
   Match,
@@ -42,10 +43,14 @@ export function MatchAdminRow({
 
   return (
     <div style={{ borderBottom: "1px solid var(--line)", padding: "14px 0" }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <strong>{match.label ?? `Match ${match.order_index}`}</strong>
-        <span className="dim" style={{ fontSize: 12 }}>
-          {teamA?.name ?? slotA} vs {teamB?.name ?? slotB}
+        <span className="dim" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          {teamA ? <TeamLogo team={teamA} size={18} /> : null}
+          {teamA?.name ?? slotA}
+          <span style={{ opacity: 0.6 }}>vs</span>
+          {teamB ? <TeamLogo team={teamB} size={18} /> : null}
+          {teamB?.name ?? slotB}
         </span>
         <span className={`pill ${match.status === "done" ? "done" : match.status === "live" ? "live" : "closed"}`}>
           {match.status}

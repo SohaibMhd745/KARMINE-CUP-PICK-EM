@@ -1,3 +1,4 @@
+import TeamLogo from "@/components/TeamLogo";
 import { computeStandings, getTournament } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,11 @@ export default async function GroupesPage() {
                   {standings.map((s, i) => (
                     <tr key={s.team.id}>
                       <td>
-                        <strong>{i + 1}.</strong> {s.team.name}
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                          <strong style={{ minWidth: 16 }}>{i + 1}.</strong>
+                          <TeamLogo team={s.team} size={22} />
+                          <span>{s.team.name}</span>
+                        </div>
                       </td>
                       <td>
                         {s.wins}V — {s.losses}D
@@ -68,11 +73,26 @@ export default async function GroupesPage() {
 
                 return (
                   <div className="grouprow" key={match.id}>
-                    <b>
-                      {a?.name ?? "?"} vs {b?.name ?? "?"}
-                    </b>
-                    <span>
-                      {winner ? `Vainqueur : ${winner.name}` : "Résultat inconnu"}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <TeamLogo team={a} size={20} />
+                        <b>{a?.name ?? "?"}</b>
+                      </div>
+                      <span className="dim" style={{ fontSize: 11 }}>vs</span>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <TeamLogo team={b} size={20} />
+                        <b>{b?.name ?? "?"}</b>
+                      </div>
+                    </div>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                      {winner ? (
+                        <>
+                          <TeamLogo team={winner} size={16} />
+                          <span>Vainqueur : <strong>{winner.name}</strong></span>
+                        </>
+                      ) : (
+                        "Résultat inconnu"
+                      )}
                     </span>
                   </div>
                 );

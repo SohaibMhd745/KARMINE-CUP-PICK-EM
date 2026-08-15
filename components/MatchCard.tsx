@@ -1,6 +1,7 @@
 "use client";
 
 import Countdown from "@/components/Countdown";
+import TeamLogo from "@/components/TeamLogo";
 import { effectiveLock, formatDateTime, lockState } from "@/lib/lock";
 import type { LockReason, Match, Stage, Team } from "@/lib/types";
 
@@ -81,10 +82,12 @@ export default function MatchCard({
             onClick={() => slot.team && onPick(slot.team.id)}
             aria-pressed={isPicked}
           >
-            <span className="badge" aria-hidden="true">
-              {slot.team ? slot.team.short_code : "?"}
-            </span>
-            <span>{slot.team ? slot.team.name : slot.label}</span>
+            <TeamLogo
+              team={slot.team}
+              fallbackText={slot.team ? slot.team.short_code : "?"}
+              size={28}
+            />
+            <span style={{ fontWeight: 600 }}>{slot.team ? slot.team.name : slot.label}</span>
             <span className="flag">
               {isWinner
                 ? `Vainqueur${slot.score !== null ? ` · ${slot.score}` : ""}`

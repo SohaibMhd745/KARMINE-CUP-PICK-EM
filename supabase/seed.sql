@@ -15,19 +15,20 @@
 --      KARMINEA  KDAVRE 3-0 · WALL BREAKERS 2-1 · DEST. CAPACITY 1-2 · FEET&FUN 0-3
 -- ---------------------------------------------------------------------
 
-insert into teams (name, short_code, group_name, seed) values
-  ('KANCEL CORP',          'KAN', 'SYLVARIS', 1),
-  ('GOONING CORP',         'GOO', 'SYLVARIS', 2),
-  ('ZEUB',                 'ZEU', 'SYLVARIS', 3),
-  ('FULL TRUST',           'FUL', 'SYLVARIS', 4),
-  ('KDAVRE CORP',          'KDA', 'KARMINEA', 1),
-  ('WALL BREAKERS',        'WAL', 'KARMINEA', 2),
-  ('DESTRUCTIVE CAPACITY', 'DES', 'KARMINEA', 3),
-  ('FEET AND FUN',         'FEE', 'KARMINEA', 4)
+insert into teams (name, short_code, group_name, seed, logo_url) values
+  ('KANCEL CORP',          'KAN', 'SYLVARIS', 1, '/assets/teams/kancel_corp.jpg'),
+  ('GOONING CORP',         'GOO', 'SYLVARIS', 2, '/assets/teams/gooning_corp.jpg'),
+  ('ZEUB',                 'ZEU', 'SYLVARIS', 3, '/assets/teams/zeub.jpg'),
+  ('FULL TRUST',           'FUL', 'SYLVARIS', 4, '/assets/teams/full_trust.jpg'),
+  ('KDAVRE CORP',          'KDA', 'KARMINEA', 1, '/assets/teams/kdavre_corp.jpg'),
+  ('WALL BREAKERS',        'WAL', 'KARMINEA', 2, '/assets/teams/wall_breakers.jpg'),
+  ('DESTRUCTIVE CAPACITY', 'DES', 'KARMINEA', 3, '/assets/teams/destructive_capacity.jpg'),
+  ('FEET AND FUN',         'FEE', 'KARMINEA', 4, '/assets/teams/feet_and_fun.jpg')
 on conflict (name) do update
   set short_code = excluded.short_code,
       group_name = excluded.group_name,
-      seed       = excluded.seed;
+      seed       = excluded.seed,
+      logo_url   = excluded.logo_url;
 
 -- ---------------------------------------------------------------------
 -- 2. ÉTAPES

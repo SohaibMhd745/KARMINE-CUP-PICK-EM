@@ -43,40 +43,40 @@ security definer
 set search_path = public
 as $$
 declare
-  m record;
+  v_match matches%rowtype;
   v_winner bigint;
   v_loser bigint;
 begin
-  select * into m from matches where id = p_match_id;
+  select * into v_match from matches where id = p_match_id;
   if not found then
     return;
   end if;
 
-  if m.winner_team_id is null then
+  if v_match.winner_team_id is null then
     -- Si le résultat est retiré, on vide les slots enfants pour les matchs non joués
     update matches set team_a_id = null
-      where team_a_src_match = m.id and status = 'pending';
+      where team_a_src_match = v_match.id and status = 'pending';
     update matches set team_b_id = null
-      where team_b_src_match = m.id and status = 'pending';
+      where team_b_src_match = v_match.id and status = 'pending';
     return;
   end if;
 
-  v_winner := m.winner_team_id;
+  v_winner := v_match.winner_team_id;
   v_loser := case
-               when m.winner_team_id = m.team_a_id then m.team_b_id
-               when m.winner_team_id = m.team_b_id then m.team_a_id
+               when v_match.winner_team_id = v_match.team_a_id then v_match.team_b_id
+               when v_match.winner_team_id = v_match.team_b_id then v_match.team_a_id
                else null
              end;
 
   update matches
      set team_a_id = case when team_a_src_type = 'winner' then v_winner else v_loser end,
          updated_at = now()
-   where team_a_src_match = m.id and status = 'pending';
+   where team_a_src_match = v_match.id and status = 'pending';
 
   update matches
      set team_b_id = case when team_b_src_type = 'winner' then v_winner else v_loser end,
          updated_at = now()
-   where team_b_src_match = m.id and status = 'pending';
+   where team_b_src_match = v_match.id and status = 'pending';
 end;
 $$;
 
@@ -88,16 +88,16 @@ security definer
 set search_path = public
 as $$
 declare
-  m record;
+  v_match_id bigint;
 begin
   -- Parcourt dans l'ordre chronologique des étapes et des matchs
-  for m in
-    select m.id
-      from matches m
-      join stages s on s.id = m.stage_id
-     order by s.order_index asc, m.order_index asc
+  for v_match_id in
+    select matches.id
+      from matches
+      join stages on stages.id = matches.stage_id
+     order by stages.order_index asc, matches.order_index asc
   loop
-    perform public.propagate_match_bracket(m.id);
+    perform public.propagate_match_bracket(v_match_id);
   end loop;
 end;
 $$;
