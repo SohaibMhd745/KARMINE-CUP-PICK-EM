@@ -86,10 +86,15 @@ export interface Profile {
   is_admin: boolean;
 }
 
+export type ClaimMethod = "auto" | "admin";
+
 export interface LegacyScore {
   alias: string;
   group_points: number;
   claimed_by: string | null;
+  /** Qui a rattaché : la machine (`auto`) ou un organisateur (`admin`). */
+  claim_method: ClaimMethod | null;
+  claimed_at: string | null;
 }
 
 export interface TournamentPlayer {

@@ -163,6 +163,11 @@ export async function updateQuestion(
 
 /* ------------------------------------------------- rattachement Excel */
 
+/**
+ * Arbitrage manuel : ne concerne que les cas où `auto_link_alias()` a
+ * refusé de trancher (homonymes, alias en double, pseudo Discord
+ * différent du nom de l'Excel).
+ */
 export async function linkAlias(
   _prev: ActionResult | null,
   form: FormData,
@@ -176,9 +181,70 @@ export async function linkAlias(
   return asAdmin(
     "link_alias",
     async (supabase) =>
-      supabase.from("legacy_scores").update({ claimed_by: claimedBy }).eq("alias", alias),
+      supabase
+        .from("legacy_scores")
+        .update({
+          claimed_by: claimedBy,
+          // `admin` fige la décision humaine : une reprise automatique
+          // ultérieure ne repassera pas dessus.
+          claim_method: claimedBy === null ? null : "admin",
+          claimed_at: claimedBy === null ? null : new Date().toISOString(),
+        })
+        .eq("alias", alias),
     { alias, claimed_by: claimedBy },
   );
+}
+
+const OUTCOME_LABELS: Record<string, string> = {
+  linked: "rattaché(s)",
+  already_linked: "déjà rattaché(s)",
+  no_match: "sans correspondance",
+  ambiguous_alias: "alias en double, à arbitrer",
+  ambiguous_profile: "homonymes, à arbitrer",
+  alias_taken: "alias déjà pris, à arbitrer",
+};
+
+/**
+ * Repasse le rattachement automatique sur tous les comptes qui n'ont pas
+ * encore d'alias. Utile après une correction de pseudo, ou pour les
+ * comptes créés avant la mise en place du système.
+ */
+export async function autoLinkAliases(): Promise<ActionResult> {
+  const profile = await getProfile();
+  if (!profile?.is_admin) {
+    return { ok: false, message: "Action réservée aux administrateurs." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("auto_link_all_aliases");
+
+  if (error) {
+    return { ok: false, message: translateDbError(error) };
+  }
+
+  const rows = (data ?? []) as { outcome: string; total: number }[];
+
+  await supabase.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "auto_link_all",
+    payload: { result: rows },
+  });
+
+  revalidatePath("/", "layout");
+
+  const linked = rows.find((r) => r.outcome === "linked")?.total ?? 0;
+  const detail = rows
+    .filter((r) => r.outcome !== "linked" && r.outcome !== "no_match")
+    .map((r) => `${r.total} ${OUTCOME_LABELS[r.outcome] ?? r.outcome}`)
+    .join(" · ");
+
+  return {
+    ok: true,
+    message:
+      linked === 0 && detail === ""
+        ? "Aucun nouveau rattachement."
+        : `${linked} rattachement(s) automatique(s).${detail ? ` Reste : ${detail}.` : ""}`,
+  };
 }
 
 /* --------------------------------------------------------- roster */

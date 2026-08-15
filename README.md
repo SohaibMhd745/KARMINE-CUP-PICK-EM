@@ -16,10 +16,14 @@ classement Excel, streams) ont été reprises dans `supabase/seed.sql`.
 ### 1. Supabase
 
 1. Crée un projet sur [supabase.com](https://supabase.com).
-2. **SQL Editor** → colle et exécute `supabase/migrations/0001_init.sql`.
+2. **SQL Editor** → exécute les migrations **dans l'ordre** :
+   `supabase/migrations/0001_init.sql`, puis `0002_auto_link_aliases.sql`.
 3. **SQL Editor** → colle et exécute `supabase/seed.sql`.
    Le script se termine par des `assert` : s'il passe sans erreur, les données
    sont bonnes. Il est **rejouable** sans créer de doublons.
+
+> Base déjà en place ? `0002` s'applique seul, à tout moment : il n'annule rien
+> et rattrape au passage les comptes déjà inscrits.
 
 ### 2. Application Discord
 
@@ -98,9 +102,49 @@ Ordre des opérations dans **/admin** :
    monde.
 5. Ouvre le round suivant. Et ainsi de suite jusqu'à la finale.
 
-**Rattachement des scores de poule** : les 58 alias de l'Excel apparaissent au
-classement dès le départ, marqués « non rattaché ». Relie-les aux comptes
-Discord au fil de l'eau dans l'onglet admin — ce n'est jamais bloquant.
+---
+
+## Rattachement des scores de poule
+
+Les alias du classement Excel **sont** les pseudos Discord des participants. Le
+rattachement est donc automatique : à l'inscription, `auto_link_alias()` relie
+l'alias au compte, et l'organisateur n'intervient que sur ce que la machine
+refuse de trancher.
+
+`normalize_alias()` absorbe les écarts d'écriture sans jamais deviner :
+
+| Alias Excel | Pseudo Discord | Rattachement |
+|---|---|---|
+| `Sohalia` | `Sohalia` | correspondance exacte |
+| `[KDAVRE CORP] Denis` | `Denis` | préfixe d'équipe retiré |
+| `ROÏ DES GWERS` | `ROI DES GWERS` | accents et espaces ignorés |
+| `Alan ☀` | `Alan` | décorations ignorées |
+
+Le rattachement est **rejoué à chaque changement de pseudo Discord** : un
+participant non reconnu reprend son pseudo de l'Excel, se reconnecte, et se
+dépanne seul.
+
+**Ce qui remonte à l'organisateur** — trois refus délibérés, parce qu'il y a des
+lots et qu'une erreur donnerait les points d'un participant à un autre :
+
+- **alias en double** — `Lornyk` et `[GOONING] Lornyk` se normalisent
+  pareil et ne valent pas le même nombre de points ;
+- **homonymes** — deux comptes Discord au même pseudo ;
+- **alias déjà pris** — le rattachement existant n'est jamais écrasé.
+
+L'onglet **/admin → Étape 4** liste ces cas avec un rapprochement **suggéré**
+(ressemblance de pseudo, préfixe d'équipe sans crochets comme
+`ZEUB Camthalion`), présélectionné mais jamais appliqué sans ton clic. Le bouton
+*Relancer le rattachement automatique* repasse sur les comptes en attente.
+
+Sur les 58 lignes de l'Excel, **55 se rattachent seules** dès que leur
+propriétaire se connecte. Les 3 restantes sont les doublons de l'Excel
+(`[GOONING] Lornyk`, `[Feet&Fun]Pauシ`, `[ZEUB] Gahann`, soit 1 point au
+total) : à toi de dire si ces lignes font double emploi ou si leurs points
+s'ajoutent — un compte ne peut porter qu'un seul alias.
+
+Rien de tout cela n'est bloquant : un alias non rattaché figure au classement
+dès le départ, marqué « non rattaché ».
 
 ---
 
@@ -139,6 +183,8 @@ Avec des lots en jeu, rien n'est laissé au client.
 | Un pronostic pour le compte d'un tiers est refusé | RLS `picks_own_insert` / `picks_own_update` |
 | Les pronostics d'autrui sont invisibles avant verrouillage | RLS `picks_own_read` + vue `match_pick_stats` |
 | Nul ne peut se déclarer admin | trigger `prevent_privilege_escalation()` |
+| Nul ne peut s'attribuer un score de poule | RLS `legacy_scores_admin_write` |
+| Un rattachement douteux est refusé, jamais deviné | `auto_link_alias()` |
 | `/admin` renvoie 404 pour un non-admin | garde serveur + RLS sur chaque écriture |
 | Chaque action d'organisateur est tracée | table `audit_log` |
 | Les points sont recalculables à l'identique | `recompute_all_scores()`, idempotente |
@@ -165,18 +211,25 @@ components/             Nav, MatchCard, PicksBoard, CrystalBall, admin/*
 lib/
   data.ts               accès aux données côté serveur
   lock.ts               logique de verrouillage (miroir du trigger SQL)
+  alias.ts              suggestions de rattachement (l'autorité est en base)
   types.ts  champions.ts
 supabase/
-  migrations/0001_init.sql   schéma, RLS, triggers, vues
-  seed.sql                   données reprises du prototype
-legacy/index.html            prototype d'origine, pour référence
+  migrations/0001_init.sql              schéma, RLS, triggers, vues
+  migrations/0002_auto_link_aliases.sql rattachement automatique des alias
+  seed.sql                              données reprises du prototype
+legacy/index.html                       prototype d'origine, pour référence
 ```
 
-### Un point d'attention
+### Deux points d'attention
 
 `lib/lock.ts` (`lockState`) duplique volontairement la logique du trigger
 `enforce_pick_window()` pour l'affichage. **Si tu modifies l'un, modifie
 l'autre** — sinon l'interface promettra des pronostics que la base refusera.
+
+`lib/alias.ts` ne **suggère** que des rapprochements approximatifs, pour
+l'organisateur. Le rattachement qui fait autorité est `auto_link_alias()` en
+base, strictement déterministe. Ne déplace jamais le flou vers la base : un
+« à peu près » ne doit pas attribuer de points tout seul.
 
 ---
 
@@ -185,13 +238,13 @@ l'autre** — sinon l'interface promettra des pronostics que la base refusera.
 ```bash
 npm run build       # compilation + types
 npm run typecheck   # types seuls
-npm run test:db     # schéma + seed + 25 tests de sécurité (nécessite Docker)
+npm run test:db     # schéma + seed + 35 tests de comportement (nécessite Docker)
 ```
 
 `npm run test:db` monte un Postgres 16 jetable, y reproduit l'environnement
 Supabase (schéma `auth`, `auth.uid()`, rôles `anon`/`authenticated`, grants par
-défaut, publication realtime), applique la migration, joue le seed **deux fois**
-pour vérifier son idempotence, puis exécute la suite de tests.
+défaut, publication realtime), applique les migrations, joue le seed **deux
+fois** pour vérifier son idempotence, puis exécute la suite de tests.
 
 Ce qu'elle couvre, en usurpant réellement les rôles Postgres :
 
@@ -215,6 +268,15 @@ Ce qu'elle couvre, en usurpant réellement les rôles Postgres :
 22. journal d'audit réservé aux admins
 23-24. impossible de s'attribuer des points en écrivant dans `points`
 25. effacer sa réponse tant que la question est ouverte
+26. normalisation des pseudos : préfixes, accents, décorations
+27-28. inscription → alias rattaché seul, préfixe d'équipe compris
+29. alias en double → refus de trancher, signalé à l'organisateur
+30. homonymes → refus, et le rattachement existant est préservé
+31. renommage Discord → profil synchronisé et rattachement rejoué
+32. un arbitrage de l'organisateur n'est jamais écrasé
+33. la reprise en masse est réservée aux admins
+34. un participant ne peut pas s'attribuer un score de poule
+35. la reprise en masse rattrape les comptes créés avant `0002`
 ```
 
 > Deux de ces tests correspondent à des défauts trouvés **pendant** le

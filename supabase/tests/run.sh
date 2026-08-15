@@ -40,8 +40,10 @@ run() {
 echo "▸ stub Supabase"
 run stub  supabase/tests/00_local_supabase_stub.sql 2>&1 | grep -iv "wal_level\|^HINT" || true
 
-echo "▸ migration"
-run init  supabase/migrations/0001_init.sql 2>&1 | grep -i error || true
+echo "▸ migrations"
+for f in supabase/migrations/*.sql; do
+  run "$(basename "$f" .sql)" "$f" 2>&1 | grep -i error || true
+done
 
 echo "▸ seed (deux fois, pour vérifier l'idempotence)"
 run seed  supabase/seed.sql 2>&1 | grep -i "notice\|error" || true

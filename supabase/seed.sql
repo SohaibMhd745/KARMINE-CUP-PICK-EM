@@ -200,9 +200,13 @@ on conflict (ign) do nothing;
 
 -- ---------------------------------------------------------------------
 -- 6. SCORES DE POULE IMPORTÉS DE L'EXCEL (58 participants)
---    `claimed_by` reste NULL : le rattachement à un compte Discord se
---    fait manuellement dans l'admin. En attendant, ces lignes
---    apparaissent quand même au classement (vue `leaderboard`).
+--    Les alias SONT les pseudos Discord : `auto_link_alias()`
+--    (migration 0002) rattache chaque ligne au compte correspondant dès
+--    l'inscription. L'organisateur n'arbitre que les cas douteux —
+--    préfixe d'équipe sans crochets, homonymes, alias en double
+--    (« Lornyk » / « [GOONING] Lornyk »).
+--    En attendant, ces lignes apparaissent quand même au classement
+--    (vue `leaderboard`), marquées « non rattaché ».
 -- ---------------------------------------------------------------------
 
 insert into legacy_scores (alias, group_points) values
@@ -270,7 +274,7 @@ on conflict (code) do nothing;
 -- ---------------------------------------------------------------------
 
 insert into streams (display_name, url, order_index) values
-  ('ROÏ DES GWERS', 'https://www.twitch.tv/hoshibasback', 1),
+  ('ROÏ DES GWERS', 'https://www.twitch.tv/hoshisbackk', 1),
   ('SHIGE',         'https://www.twitch.tv/shige_rl',     2),
   ('SOUHEYL',       'https://www.twitch.tv/souheylk',     3),
   ('DENIS',         'https://www.twitch.tv/petitdeniis',  4),

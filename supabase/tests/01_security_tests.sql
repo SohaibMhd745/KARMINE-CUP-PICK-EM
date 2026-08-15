@@ -594,5 +594,286 @@ begin
 end $$;
 rollback;
 
+-- =====================================================================
+--  Rattachement automatique des scores de poule (migration 0002)
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 26. normalize_alias() absorbe les écarts d'écriture de l'Excel
+-- ---------------------------------------------------------------------
+do $$
+begin
+  assert normalize_alias('Sohalia')             = 'sohalia',     'exact';
+  assert normalize_alias('[KDAVRE CORP] Denis') = 'denis',       'préfixe espacé';
+  assert normalize_alias('[Feet&Fun]Pauシ')      = 'pauシ',       'préfixe collé';
+  assert normalize_alias('Alan ☀')              = 'alan',        'décoration';
+  assert normalize_alias('ROÏ DES GWERS')       = 'roidesgwers', 'accent + espaces';
+  assert normalize_alias('ROI DES GWERS')       = 'roidesgwers', 'sans accent';
+  assert normalize_alias('Sadaps_')             = 'sadaps',      'ponctuation';
+  assert normalize_alias('Zackk#1234')          = 'zackk',       'discriminateur';
+  assert normalize_alias('魔')                   = '魔',          'idéogramme conservé';
+  assert normalize_alias('  ')                  is null,         'vide → null';
+
+  -- deux écritures du même participant se rejoignent
+  assert normalize_alias('[GOONING] Lornyk') = normalize_alias('Lornyk'), 'jumeaux';
+
+  raise notice 'OK 26. normalize_alias() : préfixes, accents, décorations, discriminateur';
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 27. Inscription : le pseudo Discord = l'alias Excel → rattaché seul
+-- ---------------------------------------------------------------------
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('44444444-4444-4444-4444-444444444444', 'mahyster@test.fr',
+   '{"provider_id":"100000000000000004","full_name":"Mahyster"}'::jsonb);
+
+do $$
+declare v_alias text; v_method text; v_group int;
+begin
+  select alias, claim_method into v_alias, v_method
+    from legacy_scores where claimed_by = '44444444-4444-4444-4444-444444444444';
+
+  assert v_alias = 'Mahyster', format('attendu l''alias Mahyster, trouvé %s', v_alias);
+  assert v_method = 'auto', format('attendu claim_method=auto, trouvé %s', v_method);
+
+  -- et les 6 points de poule sont immédiatement au classement
+  select group_points into v_group
+    from leaderboard where user_id = '44444444-4444-4444-4444-444444444444';
+  assert v_group = 6, format('attendu 6 pts de poule repris, trouvé %s', v_group);
+
+  raise notice 'OK 27. inscription → alias rattaché seul, 6 pts de poule repris';
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 28. Alias préfixé de son équipe : la normalisation suffit
+-- ---------------------------------------------------------------------
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('55555555-5555-5555-5555-555555555555', 'denis@test.fr',
+   '{"provider_id":"100000000000000005","full_name":"Denis"}'::jsonb);
+
+do $$
+declare v_alias text;
+begin
+  select alias into v_alias
+    from legacy_scores where claimed_by = '55555555-5555-5555-5555-555555555555';
+
+  assert v_alias = '[KDAVRE CORP] Denis',
+    format('attendu « [KDAVRE CORP] Denis », trouvé %s', v_alias);
+
+  raise notice 'OK 28. « Denis » rattaché à « [KDAVRE CORP] Denis » par normalisation';
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 29. Deux alias équivalents → la machine REFUSE de trancher
+--     (« Lornyk » 1 pt et « [GOONING] Lornyk » 1 pt : rien ne dit lequel
+--      vaut, et il y a des lots)
+-- ---------------------------------------------------------------------
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('66666666-6666-6666-6666-666666666666', 'lornyk@test.fr',
+   '{"provider_id":"100000000000000006","full_name":"lornyk"}'::jsonb);
+
+do $$
+declare n int; v_outcome text;
+begin
+  select count(*) into n
+    from legacy_scores where claimed_by = '66666666-6666-6666-6666-666666666666';
+  assert n = 0, 'ÉCHEC : la machine a tranché entre deux alias équivalents';
+
+  select payload ->> 'outcome' into v_outcome
+    from audit_log
+   where action = 'auto_link_alias'
+     and payload ->> 'user_id' = '66666666-6666-6666-6666-666666666666'
+   order by created_at desc limit 1;
+
+  assert v_outcome = 'ambiguous_alias',
+    format('attendu ambiguous_alias au journal, trouvé %s', v_outcome);
+
+  raise notice 'OK 29. alias en double → non rattaché, signalé à l''organisateur';
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 30. Homonymes : deux comptes au même pseudo, aucun n'est servi
+-- ---------------------------------------------------------------------
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('77777777-7777-7777-7777-777777777777', 'sluje1@test.fr',
+   '{"provider_id":"100000000000000007","full_name":"Sluje"}'::jsonb);
+
+do $$
+declare v_alias text;
+begin
+  select alias into v_alias
+    from legacy_scores where claimed_by = '77777777-7777-7777-7777-777777777777';
+  assert v_alias = 'Sluje', 'le premier Sluje aurait dû être rattaché';
+end $$;
+
+-- un second compte au même nom d'affichage se présente
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('88888888-8888-8888-8888-888888888888', 'sluje2@test.fr',
+   '{"provider_id":"100000000000000008","full_name":"Sluje"}'::jsonb);
+
+do $$
+declare n int; v_outcome text; v_owner uuid;
+begin
+  select count(*) into n
+    from legacy_scores where claimed_by = '88888888-8888-8888-8888-888888888888';
+  assert n = 0, 'ÉCHEC : l''homonyme a récupéré un alias';
+
+  -- le rattachement du premier n'a pas bougé
+  select claimed_by into v_owner from legacy_scores where alias = 'Sluje';
+  assert v_owner = '77777777-7777-7777-7777-777777777777',
+    'le rattachement existant a été altéré';
+
+  select payload ->> 'outcome' into v_outcome
+    from audit_log
+   where action = 'auto_link_alias'
+     and payload ->> 'user_id' = '88888888-8888-8888-8888-888888888888'
+   order by created_at desc limit 1;
+
+  assert v_outcome = 'ambiguous_profile',
+    format('attendu ambiguous_profile, trouvé %s', v_outcome);
+
+  raise notice 'OK 30. homonyme → non rattaché, rattachement existant préservé';
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 31. Changer de pseudo Discord relance le rattachement
+--     (le participant se dépanne seul, sans solliciter l'organisateur)
+-- ---------------------------------------------------------------------
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('99999999-9999-9999-9999-999999999999', 'inconnu@test.fr',
+   '{"provider_id":"100000000000000009","full_name":"PseudoQuiNeCorrespondPas"}'::jsonb);
+
+do $$
+declare n int;
+begin
+  select count(*) into n
+    from legacy_scores where claimed_by = '99999999-9999-9999-9999-999999999999';
+  assert n = 0, 'un pseudo inconnu ne doit rien rattacher';
+end $$;
+
+-- il corrige son pseudo Discord et se reconnecte : Supabase rafraîchit
+-- les métadonnées de auth.users, le profil suit, le rattachement aussi.
+update auth.users
+   set raw_user_meta_data =
+       '{"provider_id":"100000000000000009","full_name":"solartum"}'::jsonb
+ where id = '99999999-9999-9999-9999-999999999999';
+
+do $$
+declare v_name text; v_alias text; v_group int;
+begin
+  select display_name into v_name from profiles
+   where id = '99999999-9999-9999-9999-999999999999';
+  assert v_name = 'solartum', format('pseudo non synchronisé : %s', v_name);
+
+  select alias into v_alias from legacy_scores
+   where claimed_by = '99999999-9999-9999-9999-999999999999';
+  assert v_alias = 'solartum', format('attendu l''alias solartum, trouvé %s', v_alias);
+
+  select group_points into v_group from leaderboard
+   where user_id = '99999999-9999-9999-9999-999999999999';
+  assert v_group = 4, format('attendu 4 pts de poule, trouvé %s', v_group);
+
+  raise notice 'OK 31. renommage Discord → profil synchronisé et alias rattaché';
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 32. Un rattachement décidé par l'organisateur n'est jamais écrasé
+-- ---------------------------------------------------------------------
+update legacy_scores
+   set claimed_by = '66666666-6666-6666-6666-666666666666',
+       claim_method = 'admin',
+       claimed_at = now()
+ where alias = '[GOONING] Lornyk';
+
+do $$
+declare v_alias text; v_method text;
+begin
+  -- une reprise en masse ne doit pas déplacer cet arbitrage
+  perform public.auto_link_alias('66666666-6666-6666-6666-666666666666');
+
+  select alias, claim_method into v_alias, v_method
+    from legacy_scores where claimed_by = '66666666-6666-6666-6666-666666666666';
+
+  assert v_alias = '[GOONING] Lornyk', format('arbitrage déplacé vers %s', v_alias);
+  assert v_method = 'admin', format('claim_method écrasé : %s', v_method);
+
+  raise notice 'OK 32. arbitrage de l''organisateur préservé par la reprise';
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 33. La reprise en masse est réservée aux administrateurs
+-- ---------------------------------------------------------------------
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+
+do $$
+begin
+  perform public.auto_link_all_aliases();
+  raise exception 'ÉCHEC : un participant a lancé la reprise en masse';
+exception
+  when others then
+    if sqlerrm like '%FORBIDDEN%' or sqlerrm like '%permission denied%' then
+      raise notice 'OK 33. auto_link_all_aliases() refusée à un non-admin';
+    else raise; end if;
+end $$;
+rollback;
+
+-- ---------------------------------------------------------------------
+-- 34. Un participant ne peut pas se rattacher un alias lui-même
+--     (la RLS de legacy_scores fait foi, comme pour les points)
+-- ---------------------------------------------------------------------
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+do $$
+declare n int;
+begin
+  -- « Sohalia » vaut 8 points et appartient déjà à un autre compte
+  update legacy_scores set claimed_by = '33333333-3333-3333-3333-333333333333'
+   where alias = 'Sohalia';
+  get diagnostics n = row_count;
+
+  assert n = 0, 'ÉCHEC : un participant s''est attribué un score de poule';
+  raise notice 'OK 34. RLS : un participant ne peut pas s''attribuer un alias';
+exception
+  when insufficient_privilege then
+    raise notice 'OK 34. RLS : un participant ne peut pas s''attribuer un alias';
+end $$;
+rollback;
+
+-- ---------------------------------------------------------------------
+-- 35. La reprise en masse rattrape les comptes créés avant 0002
+-- ---------------------------------------------------------------------
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'birouf@test.fr',
+   '{"provider_id":"100000000000000010","full_name":"Birouf"}'::jsonb);
+
+-- on simule un compte antérieur au système : on défait son rattachement
+update legacy_scores
+   set claimed_by = null, claim_method = null, claimed_at = null
+ where claimed_by = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+do $$
+declare v_linked int; v_alias text;
+begin
+  -- on se fait passer pour l'organisateur : le garde is_admin() de la
+  -- fonction lit auth.uid(), pas le rôle Postgres
+  perform set_config('request.jwt.claim.sub',
+                     '11111111-1111-1111-1111-111111111111', true);
+
+  select total into v_linked
+    from public.auto_link_all_aliases() where outcome = 'linked';
+
+  assert v_linked >= 1, format('attendu au moins 1 rattachement, trouvé %s', v_linked);
+
+  select alias into v_alias from legacy_scores
+   where claimed_by = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  assert v_alias = 'Birouf', format('attendu Birouf, trouvé %s', v_alias);
+
+  raise notice 'OK 35. auto_link_all_aliases() rattrape les comptes antérieurs';
+end $$;
+
 do $$ begin raise notice '';
   raise notice '=== TOUS LES TESTS SONT PASSÉS ==='; end $$;

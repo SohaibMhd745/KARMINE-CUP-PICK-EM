@@ -8,6 +8,7 @@ import {
   updateQuestion,
   updateStage,
 } from "@/app/admin/actions";
+import type { AliasSuggestion } from "@/lib/alias";
 import { CHAMPIONS } from "@/lib/champions";
 import { formatDateTime } from "@/lib/lock";
 import type {
@@ -262,36 +263,103 @@ export function QuestionAdminRow({
 
 /* ------------------------------------------------- rattachement Excel */
 
+/**
+ * Arbitrage d'un alias Excel.
+ *
+ * Les cas évidents sont déjà traités par `auto_link_alias()` en base :
+ * cette ligne ne sert qu'aux refus de trancher. La suggestion la mieux
+ * classée est présélectionnée — l'organisateur valide ou corrige, mais
+ * rien ne s'applique sans son clic.
+ */
 export function AliasAdminRow({
   score,
   profiles,
+  suggestions = [],
+  twins = [],
+  claimedAliasByProfile,
 }: {
   score: LegacyScore;
   profiles: Profile[];
+  suggestions?: AliasSuggestion[];
+  twins?: string[];
+  claimedAliasByProfile: Map<string, string>;
 }) {
+  const best = suggestions[0];
+  const preselected = score.claimed_by ?? best?.profile.id ?? "";
+
   return (
-    <AdminForm action={linkAlias} submitLabel="Rattacher">
-      <input type="hidden" name="alias" value={score.alias} />
+    <div style={{ borderBottom: "1px solid var(--line)", padding: "10px 0" }}>
+      <AdminForm action={linkAlias} submitLabel="Rattacher">
+        <input type="hidden" name="alias" value={score.alias} />
 
-      <span className="grow">
-        <strong style={{ fontSize: 13 }}>{score.alias}</strong>{" "}
-        <span className="score">{score.group_points} pt{score.group_points > 1 ? "s" : ""}</span>
-      </span>
+        <span className="grow">
+          <strong style={{ fontSize: 13 }}>{score.alias}</strong>{" "}
+          <span className="score">
+            {score.group_points} pt{score.group_points > 1 ? "s" : ""}
+          </span>
+          {score.claim_method && (
+            <span
+              className="pill"
+              style={{ marginLeft: 8, fontSize: 10 }}
+              title={
+                score.claim_method === "auto"
+                  ? "Rattaché automatiquement sur correspondance du pseudo Discord"
+                  : "Arbitré par un organisateur"
+              }
+            >
+              {score.claim_method === "auto" ? "auto" : "manuel"}
+            </span>
+          )}
+        </span>
 
-      <select
-        name="claimed_by"
-        className="select"
-        defaultValue={score.claimed_by ?? ""}
-        style={{ minWidth: 220 }}
-      >
-        <option value="">— non rattaché —</option>
-        {profiles.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.display_name}
-          </option>
-        ))}
-      </select>
-    </AdminForm>
+        <select
+          name="claimed_by"
+          className="select"
+          defaultValue={preselected}
+          style={{ minWidth: 240 }}
+        >
+          <option value="">— non rattaché —</option>
+          {profiles.map((p) => {
+            const other = claimedAliasByProfile.get(p.id);
+            const busy = other !== undefined && other !== score.alias;
+
+            return (
+              <option key={p.id} value={p.id} disabled={busy}>
+                {p.display_name}
+                {busy ? ` — déjà « ${other} »` : ""}
+              </option>
+            );
+          })}
+        </select>
+      </AdminForm>
+
+      {(best || twins.length > 0) && (
+        <p className="sub" style={{ fontSize: 11, margin: "2px 0 0" }}>
+          {best && (
+            <>
+              Proposé&nbsp;: <strong>{best.profile.display_name}</strong> ({best.reason})
+              {suggestions.length > 1 && (
+                <>
+                  {" "}
+                  · autres pistes&nbsp;:{" "}
+                  {suggestions
+                    .slice(1)
+                    .map((s) => `${s.profile.display_name} (${s.reason})`)
+                    .join(", ")}
+                </>
+              )}
+            </>
+          )}
+          {best && twins.length > 0 && <br />}
+          {twins.length > 0 && (
+            <>
+              ⚠ Le même pseudo apparaît aussi sous&nbsp;: {twins.join(", ")}. Un
+              compte ne peut porter qu&apos;un seul alias — choisis lequel compte.
+            </>
+          )}
+        </p>
+      )}
+    </div>
   );
 }
 
