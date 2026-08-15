@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Grande finale — Karmine Cup" };
 
-const FINAL_CODE = "r3";
+const FINAL_CODE = "r4";
 
 export default async function FinalePage() {
   const profile = await getProfile();

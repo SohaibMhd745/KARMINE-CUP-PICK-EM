@@ -39,9 +39,10 @@ on conflict (name) do update
 insert into stages (code, label, bucket, order_index, points_per_correct, is_pickable, is_open) values
   ('group', 'Phase de groupe',    'group',    0, 0, false, false),
   ('cross', 'Cross Play Decider', 'playoffs', 1, 1, true,  false),
-  ('r1',    'Quarts de finale',   'playoffs', 2, 2, true,  false),
-  ('r2',    'Demi-finales',       'playoffs', 3, 3, true,  false),
-  ('r3',    'Grande finale',      'final',    4, 5, true,  false)
+  ('r1',    'Round 1',            'playoffs', 2, 2, true,  false),
+  ('r2',    'Round 2',            'playoffs', 3, 3, true,  false),
+  ('r3',    'Round 3',            'playoffs', 4, 4, true,  false),
+  ('r4',    'Grande finale',      'final',    5, 5, true,  false)
 on conflict (code) do update
   set label       = excluded.label,
       bucket      = excluded.bucket,
@@ -77,13 +78,13 @@ join teams  tw on tw.name  = v.winner
 on conflict (stage_id, order_index) do nothing;
 
 -- ---------------------------------------------------------------------
--- 4. PLAY-OFFS — 8 équipes en simple élimination
+-- 4. PLAY-OFFS — 8 équipes en double élimination
 --
---    CROSS-PLAY (seeding)        R1 — QUARTS              R2 — DEMIES     R3
---    C1 ZEUB    vs FEET&FUN      M1 KANCEL vs WALLBREAK.  S1 v.M1 v.M3    F  v.S1
---    C2 DEST.CAP vs FULL TRUST   M2 KDAVRE vs GOONING     S2 v.M2 v.M4       v.S2
---                                M3 v.C1   vs v.C2
---                                M4 p.C1   vs p.C2
+--    CROSS-PLAY (seeding)        R1                       R2              R3              R4
+--    C1 ZEUB    vs FEET&FUN      M1 KANCEL vs WALLBREAK.  M1 v.M1 v.M2                    F  v.M1
+--    C2 DEST.CAP vs FULL TRUST   M2 KDAVRE vs GOONING     M2 v.M3 v.M4    M1 p.M1 v.M2       v.M1
+--                                M3 v.C1   vs p.M1
+--                                M4 v.C2   vs p.M2
 -- ---------------------------------------------------------------------
 
 insert into matches (stage_id, order_index, label, best_of, team_a_id, team_b_id)
@@ -91,18 +92,21 @@ select s.id, v.idx, v.label, v.bo, ta.id, tb.id
 from (values
   ('cross', 1, 'Cross Play Decider — Match 1', 3, 'ZEUB'::text,                 'FEET AND FUN'::text),
   ('cross', 2, 'Cross Play Decider — Match 2', 3, 'DESTRUCTIVE CAPACITY',       'FULL TRUST'),
-  ('r1',    1, 'Quart de finale 1',            3, 'KANCEL CORP',                'WALL BREAKERS'),
-  ('r1',    2, 'Quart de finale 2',            3, 'KDAVRE CORP',                'GOONING CORP'),
-  ('r1',    3, 'Quart de finale 3',            3, null,                         null),
-  ('r1',    4, 'Quart de finale 4',            3, null,                         null),
-  ('r2',    1, 'Demi-finale 1',                3, null,                         null),
-  ('r2',    2, 'Demi-finale 2',                3, null,                         null),
-  ('r3',    1, 'Grande finale',                5, null,                         null)
+  ('r1',    1, 'Round 1 — Winner Bracket 1',   3, 'KANCEL CORP',                'WALL BREAKERS'),
+  ('r1',    2, 'Round 1 — Winner Bracket 2',   3, 'KDAVRE CORP',                'GOONING CORP'),
+  ('r1',    3, 'Round 1 — Lower Bracket 1',    3, null,                         null),
+  ('r1',    4, 'Round 1 — Lower Bracket 2',    3, null,                         null),
+  ('r2',    1, 'Round 2 — Winner Bracket',     3, null,                         null),
+  ('r2',    2, 'Round 2 — Lower Bracket',      3, null,                         null),
+  ('r3',    1, 'Round 3 — Lower Bracket',      3, null,                         null),
+  ('r4',    1, 'Grande finale',                5, null,                         null)
 ) as v(stage_code, idx, label, bo, team_a, team_b)
 join stages s on s.code = v.stage_code
 left join teams ta on ta.name = v.team_a
 left join teams tb on tb.name = v.team_b
-on conflict (stage_id, order_index) do nothing;
+on conflict (stage_id, order_index) do update
+  set label   = excluded.label,
+      best_of = excluded.best_of;
 
 -- Câblage du bracket : chaque slot vide pointe vers le vainqueur ou le
 -- perdant d'un match amont. Le trigger `propagate_bracket()` fera le reste.
@@ -115,15 +119,17 @@ begin
   for w in
     select * from (values
       ('r1', 3, 'a', 'cross', 1, 'winner'),
-      ('r1', 3, 'b', 'cross', 2, 'winner'),
-      ('r1', 4, 'a', 'cross', 1, 'loser'),
-      ('r1', 4, 'b', 'cross', 2, 'loser'),
+      ('r1', 3, 'b', 'r1',    1, 'loser'),
+      ('r1', 4, 'a', 'cross', 2, 'winner'),
+      ('r1', 4, 'b', 'r1',    2, 'loser'),
       ('r2', 1, 'a', 'r1',    1, 'winner'),
-      ('r2', 1, 'b', 'r1',    3, 'winner'),
-      ('r2', 2, 'a', 'r1',    2, 'winner'),
+      ('r2', 1, 'b', 'r1',    2, 'winner'),
+      ('r2', 2, 'a', 'r1',    3, 'winner'),
       ('r2', 2, 'b', 'r1',    4, 'winner'),
-      ('r3', 1, 'a', 'r2',    1, 'winner'),
-      ('r3', 1, 'b', 'r2',    2, 'winner')
+      ('r3', 1, 'a', 'r2',    1, 'loser'),
+      ('r3', 1, 'b', 'r2',    2, 'winner'),
+      ('r4', 1, 'a', 'r2',    1, 'winner'),
+      ('r4', 1, 'b', 'r3',    1, 'winner')
     ) as t(stage_code, order_index, slot, src_stage, src_order, src_type)
   loop
     select m.id into v_target
@@ -257,14 +263,14 @@ from (values
   ('r2',    'r2_most_deaths',    'Joueur avec le plus de morts',    'player',   2, 4),
   ('r2',    'r2_best_vision',    'Meilleur score de vision',        'player',   2, 5),
 
-  ('r3',    'r3_champion',       'Équipe championne',               'team',     5, 1),
-  ('r3',    'r3_best_kda',       'Meilleur KDA de la finale',       'player',   2, 2),
-  ('r3',    'r3_most_banned',    'Champion le plus banni',          'champion', 2, 3),
-  ('r3',    'r3_first_ace',      'Première équipe à faire un ace',  'team',     2, 4),
-  ('r3',    'r3_most_deaths',    'Joueur avec le plus de morts',    'player',   2, 5),
-  ('r3',    'r3_best_vision',    'Meilleur score de vision',        'player',   2, 6),
-  ('r3',    'r3_pentakill',      'Un pentakill sera réalisé',       'boolean',  3, 7),
-  ('r3',    'r3_most_played',    'Champion le plus joué',           'champion', 2, 8)
+  ('r4',    'r4_champion',       'Équipe championne',               'team',     5, 1),
+  ('r4',    'r4_best_kda',       'Meilleur KDA de la finale',       'player',   2, 2),
+  ('r4',    'r4_most_banned',    'Champion le plus banni',          'champion', 2, 3),
+  ('r4',    'r4_first_ace',      'Première équipe à faire un ace',  'team',     2, 4),
+  ('r4',    'r4_most_deaths',    'Joueur avec le plus de morts',    'player',   2, 5),
+  ('r4',    'r4_best_vision',    'Meilleur score de vision',        'player',   2, 6),
+  ('r4',    'r4_pentakill',      'Un pentakill sera réalisé',       'boolean',  3, 7),
+  ('r4',    'r4_most_played',    'Champion le plus joué',           'champion', 2, 8)
 ) as v(stage_code, code, label, kind, points, idx)
 join stages s on s.code = v.stage_code
 on conflict (code) do nothing;
@@ -309,11 +315,11 @@ begin
   assert n = 12, format('attendu 12 matchs de poule, trouvé %s', n);
 
   select count(*) into n from matches m join stages s on s.id = m.stage_id where s.code <> 'group';
-  assert n = 9, format('attendu 9 matchs de play-offs, trouvé %s', n);
+  assert n = 10, format('attendu 10 matchs de play-offs, trouvé %s', n);
 
   select count(*) into n from matches
    where team_a_src_match is not null or team_b_src_match is not null;
-  assert n = 5, format('attendu 5 matchs câblés, trouvé %s', n);
+  assert n = 6, format('attendu 6 matchs câblés, trouvé %s', n);
 
   select count(*) into n from tournament_players;
   assert n = 40, format('attendu 40 joueurs, trouvé %s', n);
@@ -321,6 +327,6 @@ begin
   select count(*) into n from legacy_scores;
   assert n = 58, format('attendu 58 participants Excel, trouvé %s', n);
 
-  raise notice 'Seed OK : 8 équipes · 21 matchs · 40 joueurs · 58 participants · % questions',
+  raise notice 'Seed OK : 8 équipes · 22 matchs · 40 joueurs · 58 participants · % questions',
     (select count(*) from questions);
 end $$;
