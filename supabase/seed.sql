@@ -106,7 +106,9 @@ left join teams ta on ta.name = v.team_a
 left join teams tb on tb.name = v.team_b
 on conflict (stage_id, order_index) do update
   set label   = excluded.label,
-      best_of = excluded.best_of;
+      best_of = excluded.best_of,
+      team_a_id = coalesce(matches.team_a_id, excluded.team_a_id),
+      team_b_id = coalesce(matches.team_b_id, excluded.team_b_id);
 
 -- Câblage du bracket : chaque slot vide pointe vers le vainqueur ou le
 -- perdant d'un match amont. Le trigger `propagate_bracket()` fera le reste.

@@ -60,6 +60,152 @@ function intOrNull(form: FormData, key: string): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
+/* ------------------------------------------------------------- propagation bracket */
+
+const INITIAL_MATCH_SEEDS: {
+  stageCode: string;
+  orderIndex: number;
+  teamAName: string;
+  teamBName: string;
+}[] = [
+  { stageCode: "cross", orderIndex: 1, teamAName: "ZEUB", teamBName: "FEET AND FUN" },
+  { stageCode: "cross", orderIndex: 2, teamAName: "DESTRUCTIVE CAPACITY", teamBName: "FULL TRUST" },
+  { stageCode: "r1", orderIndex: 1, teamAName: "KANCEL CORP", teamBName: "WALL BREAKERS" },
+  { stageCode: "r1", orderIndex: 2, teamAName: "KDAVRE CORP", teamBName: "GOONING CORP" },
+];
+
+/**
+ * Propage les équipes qualifiées (vainqueurs / perdants) dans tout le bracket.
+ * Fonctionne à la fois via la fonction RPC PostgreSQL si présente et via
+ * un calcul direct en TypeScript pour garantir la cohérence immédiate.
+ */
+export async function propagateBracket(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<number> {
+  // 1. Tenter la procédure stockée PostgreSQL
+  try {
+    await supabase.rpc("propagate_all_brackets");
+  } catch {
+    // Si la migration 0004 n'est pas encore appliquée en base, on poursuit en TS
+  }
+
+  // 2. Récupérer les étapes, équipes et matchs
+  const [{ data: stages }, { data: teams }, { data: matches }] = await Promise.all([
+    supabase.from("stages").select("id, code, order_index"),
+    supabase.from("teams").select("id, name"),
+    supabase
+      .from("matches")
+      .select(
+        "id, stage_id, order_index, team_a_id, team_b_id, team_a_src_match, team_a_src_type, team_b_src_match, team_b_src_type, winner_team_id, status",
+      ),
+  ]);
+
+  if (!matches || !stages || !teams) return 0;
+
+  const stagesById = new Map(stages.map((s) => [s.id, s]));
+  const stagesByCode = new Map(stages.map((s) => [s.code, s]));
+  const teamsByName = new Map(teams.map((t) => [t.name, t]));
+  const matchesById = new Map(matches.map((m) => [m.id, m]));
+
+  let updatedCount = 0;
+
+  // 3. S'assurer que les matchs initiaux ont bien leurs équipes de départ
+  for (const seed of INITIAL_MATCH_SEEDS) {
+    const stage = stagesByCode.get(seed.stageCode);
+    if (!stage) continue;
+
+    const match = matches.find(
+      (m) => m.stage_id === stage.id && m.order_index === seed.orderIndex,
+    );
+    if (!match) continue;
+
+    const teamA = teamsByName.get(seed.teamAName);
+    const teamB = teamsByName.get(seed.teamBName);
+
+    const updatePayload: { team_a_id?: number; team_b_id?: number } = {};
+    if (teamA && match.team_a_id !== teamA.id) {
+      updatePayload.team_a_id = teamA.id;
+      match.team_a_id = teamA.id;
+    }
+    if (teamB && match.team_b_id !== teamB.id) {
+      updatePayload.team_b_id = teamB.id;
+      match.team_b_id = teamB.id;
+    }
+
+    if (Object.keys(updatePayload).length > 0) {
+      await supabase.from("matches").update(updatePayload).eq("id", match.id);
+      updatedCount++;
+    }
+  }
+
+  // 4. Cascade de propagation (jusqu'à 6 passes pour traverser tout le bracket)
+  for (let pass = 0; pass < 6; pass++) {
+    let changedInPass = false;
+
+    for (const match of matches) {
+      // Propagation slot A
+      if (match.team_a_src_match && match.status === "pending") {
+        const src = matchesById.get(match.team_a_src_match);
+        if (src) {
+          let expectedTeamId: number | null = null;
+          if (src.winner_team_id) {
+            const loserId =
+              src.winner_team_id === src.team_a_id
+                ? src.team_b_id
+                : src.winner_team_id === src.team_b_id
+                ? src.team_a_id
+                : null;
+            expectedTeamId =
+              match.team_a_src_type === "winner" ? src.winner_team_id : loserId;
+          }
+
+          if (match.team_a_id !== expectedTeamId) {
+            match.team_a_id = expectedTeamId;
+            await supabase
+              .from("matches")
+              .update({ team_a_id: expectedTeamId })
+              .eq("id", match.id);
+            changedInPass = true;
+            updatedCount++;
+          }
+        }
+      }
+
+      // Propagation slot B
+      if (match.team_b_src_match && match.status === "pending") {
+        const src = matchesById.get(match.team_b_src_match);
+        if (src) {
+          let expectedTeamId: number | null = null;
+          if (src.winner_team_id) {
+            const loserId =
+              src.winner_team_id === src.team_a_id
+                ? src.team_b_id
+                : src.winner_team_id === src.team_b_id
+                ? src.team_a_id
+                : null;
+            expectedTeamId =
+              match.team_b_src_type === "winner" ? src.winner_team_id : loserId;
+          }
+
+          if (match.team_b_id !== expectedTeamId) {
+            match.team_b_id = expectedTeamId;
+            await supabase
+              .from("matches")
+              .update({ team_b_id: expectedTeamId })
+              .eq("id", match.id);
+            changedInPass = true;
+            updatedCount++;
+          }
+        }
+      }
+    }
+
+    if (!changedInPass) break;
+  }
+
+  return updatedCount;
+}
+
 /* ------------------------------------------------------------- matchs */
 
 export async function publishResult(
@@ -80,8 +226,8 @@ export async function publishResult(
 
   return asAdmin(
     "publish_result",
-    async (supabase) =>
-      supabase
+    async (supabase) => {
+      const { error } = await supabase
         .from("matches")
         .update({
           winner_team_id: winnerTeamId,
@@ -89,7 +235,15 @@ export async function publishResult(
           score_b: intOrNull(form, "score_b"),
           status,
         })
-        .eq("id", matchId),
+        .eq("id", matchId);
+
+      if (error) return { error };
+
+      // Propage immédiatement les vainqueurs et perdants sur les matchs aval
+      await propagateBracket(supabase);
+
+      return { error: null };
+    },
     { match_id: matchId, winner_team_id: winnerTeamId, status },
   );
 }
@@ -265,15 +419,28 @@ export async function assignPlayerTeam(
   );
 }
 
-/* ---------------------------------------------------------- rescoring */
+/* ---------------------------------------------------------- rescoring & bracket */
+
+export async function resyncBracket(): Promise<ActionResult> {
+  return asAdmin(
+    "resync_bracket",
+    async (supabase) => {
+      const count = await propagateBracket(supabase);
+      return { error: null, payload: { count } };
+    },
+    {},
+  );
+}
 
 export async function recomputeScores(): Promise<ActionResult> {
   return asAdmin(
     "recompute_scores",
     async (supabase) => {
+      await propagateBracket(supabase);
       const { error } = await supabase.rpc("recompute_all_scores");
       return { error };
     },
     {},
   );
 }
+

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import AutoLinkButton from "@/components/admin/AutoLinkButton";
 import RecomputeButton from "@/components/admin/RecomputeButton";
+import ResyncBracketButton from "@/components/admin/ResyncBracketButton";
 import {
   AliasAdminRow,
   MatchAdminRow,
@@ -143,19 +144,25 @@ export default async function AdminPage() {
           />
         ))}
 
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap" }}>
           <RecomputeButton />
+          <ResyncBracketButton />
         </div>
       </section>
 
       {/* ------------------------------------------------------- matchs */}
       <section className="card" style={{ marginBottom: 20 }}>
         <div className="ey">ÉTAPE 2</div>
-        <h2 className="title-sm">Résultats et horaires</h2>
-        <p className="sub">
-          Publier un vainqueur remplit automatiquement les slots «&nbsp;à
-          déterminer&nbsp;» du tour suivant.
-        </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <h2 className="title-sm">Résultats et horaires</h2>
+            <p className="sub">
+              Publier un vainqueur remplit automatiquement les slots «&nbsp;à
+              déterminer&nbsp;» du tour suivant.
+            </p>
+          </div>
+          <ResyncBracketButton />
+        </div>
 
         {pickableStages.map((stage) => {
           const matches = tournament.matches.filter((m) => m.stage_id === stage.id);
