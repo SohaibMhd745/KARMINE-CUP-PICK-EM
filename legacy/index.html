@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>KARMINE CUP — Pick'em</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap");
+      :root {
+        --bg: #f7f8fb;
+        --ink: #241947;
+        --muted: #727486;
+        --line: #dcd7e8;
+        --lav: #eee7ff;
+        --purple: #7446bb;
+        --cyan: #75cde5;
+        --green: #217c5b;
+        --red: #c75a72;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: linear-gradient(135deg, #fff, #f1f0f8);
+        color: var(--ink);
+        font:
+          14px Inter,
+          Arial,
+          sans-serif;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: #ffffffef;
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(12px);
+      }
+      .nav {
+        max-width: 1250px;
+        margin: auto;
+        height: 70px;
+        padding: 0 22px;
+        display: flex;
+        align-items: center;
+        gap: 22px;
+      }
+      .logo {
+        font-family: "DM Serif Display", Georgia, serif;
+        font-size: 21px;
+      }
+      .nav button {
+        height: 100%;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        background: none;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .nav button.active,
+      .nav button:hover {
+        color: var(--purple);
+        border-color: var(--purple);
+      }
+      .fill {
+        flex: 1;
+      }
+      .discord {
+        background: var(--ink) !important;
+        color: #fff !important;
+        border-radius: 5px;
+        padding: 10px 13px !important;
+      }
+      .wrap {
+        max-width: 1250px;
+        margin: auto;
+        padding: 40px 22px 80px;
+      }
+      .hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        margin-bottom: 25px;
+      }
+      .ey {
+        color: var(--purple);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-weight: 900;
+      }
+      .hero h1 {
+        font:
+          normal clamp(42px, 6vw, 76px)/0.95 "DM Serif Display",
+          Georgia,
+          serif;
+        margin: 11px 0;
+      }
+      .hero p {
+        color: var(--muted);
+        max-width: 630px;
+        line-height: 1.6;
+      }
+      .status {
+        text-align: right;
+        color: var(--cyan);
+        font-weight: 900;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+      }
+      .card {
+        background: #ffffffdf;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 22px;
+        box-shadow: 0 13px 35px #412b810b;
+      }
+      .page.hidden,
+      .round.hidden {
+        display: none;
+      }
+      .tabs,
+      .roundnav {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .tab,
+      .roundnav button {
+        background: #fff;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        padding: 13px 16px;
+        border-radius: 5px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .tab strong {
+        display: block;
+        color: var(--ink);
+        margin-bottom: 4px;
+      }
+      .tab.active,
+      .roundnav button.active {
+        background: var(--lav);
+        border-color: var(--purple);
+        color: var(--purple);
+      }
+      .tab.locked {
+        opacity: 0.42;
+        filter: grayscale(0.8);
+        cursor: not-allowed;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr 330px;
+        gap: 22px;
+      }
+      .groups {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+      }
+      .group {
+        background: var(--lav);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 15px;
+      }
+      .group h3 {
+        font:
+          normal 22px "DM Serif Display",
+          Georgia,
+          serif;
+        color: var(--purple);
+        margin: 0 0 10px;
+      }
+      .match {
+        border-top: 1px solid #d8cfee;
+        padding: 12px 0;
+      }
+      .match b {
+        display: block;
+      }
+      .match span {
+        color: var(--green);
+        font-size: 12px;
+      }
+      .notice {
+        background: var(--lav);
+        border-left: 3px solid var(--purple);
+        padding: 12px 14px;
+        color: #4d4271;
+        line-height: 1.6;
+        margin: 15px 0;
+        font-size: 13px;
+      }
+      .matches {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+      }
+      .matchbox {
+        border: 1px solid #454754;
+        background: #fff;
+      }
+      .matchtitle {
+        font-size: 11px;
+        color: var(--muted);
+        padding: 8px 10px;
+        border-bottom: 1px solid #454754;
+      }
+      .team {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 13px 10px;
+        border: 0;
+        border-bottom: 1px solid #d8d8dc;
+        background: #fff;
+        color: #555;
+        text-align: left;
+        cursor: pointer;
+      }
+      .team:last-child {
+        border-bottom: 0;
+      }
+      .team.selected {
+        background: #e9ddff;
+        color: var(--purple);
+        box-shadow: inset 4px 0 var(--purple);
+      }
+      .team .badge {
+        width: 25px;
+        height: 25px;
+        display: grid;
+        place-items: center;
+        background: var(--lav);
+        color: var(--purple);
+        font-size: 10px;
+        margin-right: 9px;
+      }
+      .team small {
+        margin-left: auto;
+        color: var(--muted);
+      }
+      .crystal h2 {
+        font:
+          normal 29px "DM Serif Display",
+          Georgia,
+          serif;
+        margin: 0 0 5px;
+      }
+      .question {
+        background: #faf9ff;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 13px;
+        margin-top: 10px;
+      }
+      .question label {
+        display: block;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #c9bfdf;
+        background: #fff;
+        border-radius: 4px;
+        color: var(--ink);
+      }
+      .submit {
+        width: 100%;
+        padding: 13px;
+        border: 0;
+        border-radius: 5px;
+        background: var(--ink);
+        color: #fff;
+        font-weight: 800;
+        margin-top: 18px;
+        cursor: pointer;
+      }
+      .points {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        padding: 11px 0;
+        color: var(--muted);
+      }
+      .points b {
+        color: var(--green);
+      }
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .table th,
+      .table td {
+        text-align: left;
+        padding: 12px 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      .table th {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .rank {
+        color: var(--purple);
+        font-weight: 900;
+      }
+      .score {
+        color: var(--green);
+        font-weight: 900;
+      }
+      .streams {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+      .stream {
+        background: #111026;
+        color: #fff;
+        border-radius: 6px;
+        padding: 16px;
+      }
+      .stream strong {
+        display: block;
+        color: #c9baff;
+        margin-bottom: 7px;
+      }
+      .stream a {
+        color: #9fc6ff;
+      }
+      .adminonly {
+        display: none;
+      }
+      .adminpanel {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .adminrow {
+        display: flex;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      .adminrow select {
+        flex: 1;
+      }
+      .adminrow button {
+        border: 0;
+        border-radius: 4px;
+        padding: 8px;
+        cursor: pointer;
+      }
+      .footer {
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 30px;
+      }
+      @media (max-width: 850px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .groups,
+        .matches,
+        .streams,
+        .adminpanel {
+          grid-template-columns: 1fr;
+        }
+        .hero {
+          display: block;
+        }
+        .status {
+          text-align: left;
+          margin-top: 15px;
+        }
+        .nav {
+          gap: 10px;
+        }
+        .nav button {
+          font-size: 9px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="nav">
+        <div class="logo">✦ KARMINE CUP</div>
+        <button class="active" data-page="group">GROUPE</button><button data-page="playoffs">PLAY-OFFS</button><button data-page="final">FINALE</button><button data-page="streams">STREAMS</button><button data-page="ranking">CLASSEMENT</button
+        ><button class="adminonly" id="adminNav" data-page="admin">MISE À JOUR</button>
+        <div class="fill"></div>
+        <button class="discord" id="login">SE CONNECTER AVEC DISCORD</button>
+      </div>
+    </header>
+    <main class="wrap">
+      <div class="hero">
+        <div>
+          <div class="ey">PICK'EM COMMUNAUTAIRE</div>
+          <h1>Prêt·e à faire<br />tes pronostics ?</h1>
+          <p>Entre dans la compétition, suis les matchs et tente de deviner les moments qui feront l’histoire de la Karmine Cup.</p>
+        </div>
+        <div class="status">VIOLET PASTEL<br /><span style="color: var(--muted); font-weight: 500; letter-spacing: 0">KARMINE CUP PICK'EM</span></div>
+      </div>
+      <div id="group" class="page">
+        <div class="tabs">
+          <button class="tab active"><strong>PHASE DE GROUPE</strong>Résultats Excel</button><button class="tab locked" disabled><strong>PICK'EM</strong>Bientôt disponible</button><button class="tab locked" disabled><strong>BOULE DE CRISTAL</strong>Bientôt disponible</button>
+        </div>
+        <div class="layout">
+          <div class="card">
+            <h2 style="font: normal 30px &quot;DM Serif Display&quot;">Phase de groupe</h2>
+            <p class="sub">Résultats des groupes SYLVARIS et KARMINEA importés depuis les sondages.</p>
+            <div class="notice">Connecte-toi avec Discord pour retrouver ton score associé à ton pseudo Excel.</div>
+            <div class="groups" id="groups"></div>
+          </div>
+          <aside class="card">
+            <h2 style="font: normal 29px &quot;DM Serif Display&quot;">Ton compte</h2>
+            <p class="sub" id="account">Connecte-toi avec Discord pour afficher tes résultats.</p>
+            <button class="discord" id="loginSide">SE CONNECTER</button>
+            <div class="points"><span>Score groupe</span><b id="myScore">—</b></div>
+          </aside>
+        </div>
+      </div>
+      <div id="playoffs" class="page hidden">
+        <div class="roundnav"><button class="active" data-round="cross">CROSS PLAY DECIDER</button><button data-round="r1">ROUND 1</button><button data-round="r2">ROUND 2</button><button data-round="r3">ROUND 3</button></div>
+        <div id="cross" class="round"></div>
+        <div id="r1" class="round hidden"></div>
+        <div id="r2" class="round hidden"></div>
+        <div id="r3" class="round hidden"></div>
+      </div>
+      <div id="final" class="page hidden">
+        <div class="layout">
+          <div class="card">
+            <div class="ey">GRANDE FINALE</div>
+            <h1 style="font: normal 60px &quot;DM Serif Display&quot;">La dernière prédiction.</h1>
+            <p class="sub">La finale compte davantage dans le classement général.</p>
+            <div id="finalPick"></div>
+          </div>
+          <div class="card crystal">
+            <h2>Boule de cristal finale</h2>
+            <div id="finalCrystal"></div>
+          </div>
+        </div>
+      </div>
+      <div id="streams" class="page hidden">
+        <div class="card">
+          <div class="ey">À NE PAS MANQUER</div>
+          <h1 style="font: normal 60px &quot;DM Serif Display&quot;">Les streams de la Cup.</h1>
+          <p class="sub">Retrouve les participants qui streameront les matchs.</p>
+          <div class="streams">
+            <div class="stream"><strong>ROÏ DES GWERS</strong><a href="https://www.twitch.tv/hoshibasback" target="_blank">twitch.tv/hoshibasback</a></div>
+            <div class="stream"><strong>SHIGE</strong><a href="https://www.twitch.tv/shige_rl" target="_blank">twitch.tv/shige_rl</a></div>
+            <div class="stream"><strong>SOUHEYL</strong><a href="https://twitch.tv/souheylk" target="_blank">twitch.tv/souheylk</a></div>
+            <div class="stream"><strong>DENIS</strong><a href="https://www.twitch.tv/petitdeniis" target="_blank">twitch.tv/petitdeniis</a></div>
+            <div class="stream"><strong>ALAN ☀</strong><a href="https://twitch.tv/soleilalan" target="_blank">twitch.tv/soleilalan</a></div>
+            <div class="stream"><strong>LOWAN</strong><a href="https://twitch.tv/loacht" target="_blank">twitch.tv/loacht</a></div>
+            <div class="stream"><strong>NAMAS</strong><a href="https://www.twitch.tv/namas_" target="_blank">twitch.tv/namas_</a></div>
+          </div>
+        </div>
+      </div>
+      <div id="ranking" class="page hidden">
+        <div class="card">
+          <div class="ey">CLASSEMENT GÉNÉRAL</div>
+          <h1 style="font: normal 60px &quot;DM Serif Display&quot;">Les visionnaires.</h1>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Participant</th>
+                <th>Groupe</th>
+                <th>Play-offs</th>
+                <th>Finale</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="ranking"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="admin" class="page hidden">
+        <div class="layout">
+          <div class="card">
+            <div class="ey">ORGANISATEUR</div>
+            <h1 style="font: normal 45px &quot;DM Serif Display&quot;">Mise à jour du bracket</h1>
+            <p class="notice">Cette page est visible uniquement pour le compte Discord administrateur configuré dans le code.</p>
+            <div id="adminForms"></div>
+            <button class="submit" onclick="applyAdmin()">PUBLIER LES MISES À JOUR</button><button class="submit" style="background: #eee; color: #555" onclick="resetBracket()">RÉINITIALISER</button>
+          </div>
+          <aside class="card">
+            <h2 style="font: normal 29px &quot;DM Serif Display&quot;">Instructions</h2>
+            <p class="sub">Remplace les équipes par les gagnants et perdants réels, puis publie. Les participants verront les affiches actualisées.</p>
+          </aside>
+        </div>
+      </div>
+      <div class="footer">KARMINE CUP · Pick'em</div>
+    </main>
+    <script>
+      const ADMIN_DISCORD_ID = "4bc2139f-7535-479f-8fdd-b04731d20d1f";
+      const groups = {
+        SYLVARIS: {
+          teams: [
+            ["KANCEL CORP", "FULL TRUST"],
+            ["ZEUB", "GOONING CORP"],
+            ["KANCEL CORP", "ZEUB"],
+            ["FULL TRUST", "GOONING CORP"],
+            ["KANCEL CORP", "GOONING CORP"],
+            ["FULL TRUST", "ZEUB"],
+          ],
+          winners: ["KANCEL CORP", "GOONING CORP", "KANCEL CORP", "GOONING CORP", "KANCEL CORP", "ZEUB"],
+        },
+        KARMINEA: {
+          teams: [
+            ["DESTRUCTIVE CAPACITY", "FEET AND FUN"],
+            ["KDAVRE CORP", "WALL BREAKERS"],
+            ["DESTRUCTIVE CAPACITY", "KDAVRE CORP"],
+            ["FEET AND FUN", "WALL BREAKERS"],
+            ["DESTRUCTIVE CAPACITY", "WALL BREAKERS"],
+            ["FEET AND FUN", "KDAVRE CORP"],
+          ],
+          winners: ["DESTRUCTIVE CAPACITY", "KDAVRE CORP", "KDAVRE CORP", "WALL BREAKERS", "WALL BREAKERS", "KDAVRE CORP"],
+        },
+      };
+      const teams = ["ZEUB", "FEET AND FUN", "DESTRUCTIVE CAPACITY", "FULL TRUST", "KANCEL CORP", "WALL BREAKERS", "KDAVRE CORP", "GOONING CORP"];
+      const players = [
+        "Pablo",
+        "Denis",
+        "Souheyl",
+        "Deleo",
+        "KC Keria",
+        "Hedro",
+        "Shige",
+        "Yngvar",
+        "Neptunew",
+        "Aynashaa",
+        "Hoshi",
+        "Lefwan",
+        "LowResse",
+        "Gahann",
+        "Sadaps_",
+        "HappyDridri",
+        "Namas",
+        "Zeclipses",
+        "Z3RO",
+        "Basil",
+        "XaleCl",
+        "Dest3ye",
+        "Alan",
+        "Oscar",
+        "Termidi",
+        "Lornyk",
+        "Frix",
+        "Hatim",
+        "Hichem",
+        "Lowan",
+        "Blueiix",
+        "muzeyyi",
+        "Lennarel",
+        "Xofyx",
+        "Pauシ",
+        "SSIAP",
+        "Florian",
+        "Rayou",
+        "Aekiro",
+        "Ofzebendo",
+      ];
+      const champs = ["AHRI", "AZIR", "CAITLYN", "JINX", "LEE SIN", "THRESH", "VIEGO", "YONE", "GNAR"];
+      const ranking = [
+        ["Sohalia", 8],
+        ["[Kancel Team] Florian", 8],
+        ["[Wall Breakers] Z3RO", 8],
+        ["Sluje", 7],
+        ["Mahyster", 6],
+        ["rwby", 6],
+        ["Aynashaa", 5],
+        ["HappyDridri", 5],
+        ["Ashway", 4],
+        ["Basil", 4],
+        ["Shige", 4],
+        ["Termidi", 4],
+        ["solartum", 4],
+        ["4Fingers", 3],
+        ["Aekiro", 3],
+        ["Mori", 3],
+        ["Ofzebendo", 3],
+        ["Pablo", 3],
+        ["[Dest. Capacity] Neptunew", 3],
+        ["[GOONING] Lowan", 3],
+        ["[KDAVRE CORP] Denis", 3],
+        ["Alan ☀", 2],
+        ["Birouf", 2],
+        ["Jpremy", 2],
+        ["KC Keria", 2],
+        ["LowResse", 2],
+        ["Rayou", 2],
+        ["ZEUB Camthalion", 2],
+        ["Zackk", 2],
+        ["[KDAVRE CORP] Souheyl", 2],
+        ["[Kadavre Corp] Deleo", 2],
+        ["[ZEUB] Sadaps_", 2],
+        ["Dest3ye", 1],
+        ["Hedro", 1],
+        ["Izuna", 1],
+        ["Lornyk", 1],
+        ["Oscar", 1],
+        ["Pauシ", 1],
+        ["Yngvar", 1],
+        ["Zeclipses", 1],
+        ["[Feet&Fun] Lennarel", 1],
+        ["[Feet&Fun] Xofyx", 1],
+        ["[Full Trust] XaleCl", 1],
+        ["[GOONING] Lornyk", 1],
+        ["Eagle", 0],
+        ["Frix", 0],
+        ["Gahann", 0],
+        ["Hatim", 0],
+        ["Hichem", 0],
+        ["Lefwan", 0],
+        ["Pau2", 0],
+        ["ROI DES GWERS", 0],
+        ["Shinox", 0],
+        ["[Feet&Fun] Blueiix", 0],
+        ["[Feet&Fun]Pauシ", 0],
+        ["[ZEUB] Gahann", 0],
+        ["ju", 0],
+        ["魔", 0],
+      ];
+      let bracket = JSON.parse(localStorage.getItem("kcBracket") || "null") || {
+        cross: [
+          ["ZEUB", "FEET AND FUN"],
+          ["DESTRUCTIVE CAPACITY", "FULL TRUST"],
+        ],
+        r1: [
+          ["KANCEL CORP", "WALL BREAKERS"],
+          ["KDAVRE CORP", "GOONING CORP"],
+          ["À DÉTERMINER", "À DÉTERMINER"],
+          ["À DÉTERMINER", "À DÉTERMINER"],
+        ],
+        r2: [
+          ["À DÉTERMINER", "À DÉTERMINER"],
+          ["À DÉTERMINER", "À DÉTERMINER"],
+        ],
+        r3: [["À DÉTERMINER", "À DÉTERMINER"]],
+      };
+      let user = null,
+        selection = JSON.parse(localStorage.getItem("kcSelection") || "{}");
+      function opts(a) {
+        return "<option>Choisir</option>" + a.map((x) => `<option>${x}</option>`).join("");
+      }
+      function q(label, a) {
+        return `<div class="question"><label>${label}</label><select class="select">${opts(a)}</select></div>`;
+      }
+      function match(key, t, i) {
+        return `<div class="matchbox"><div class="matchtitle">MATCH ${i + 1}</div>${t.map((x) => `<button class="team ${selection[key] === x ? "selected" : ""}" onclick="choose('${key}','${x.replaceAll("'", "\\'")}')"><span class="badge">${x === "À DÉTERMINER" ? "?" : x.slice(0, 2)}</span>${x === "À DÉTERMINER" ? "À déterminer" : x}<small>${selection[key] === x ? "QUALIFIÉ" : "CHOISIR"}</small></button>`).join("")}</div>`;
+      }
+      function crystal() {
+        return q("MEILLEUR KDA", players) + q("CHAMPION LE PLUS BAN", champs) + q("PREMIER ACE", teams) + q("PLUS DE MORTS", players) + q("MEILLEURE VISION", players);
+      }
+      function roundHTML(key, title) {
+        return `<div class="layout"><div class="card"><h2 style="font:normal 31px 'DM Serif Display'">${title}</h2><p class="sub">Choisis une équipe qualifiée par match.</p><div class="notice">L’équipe choisie avance ; l’autre est considérée comme éliminée dans ton pronostic.</div><div class="matches">${bracket[key].map((t, i) => match(key + "-" + i, t, i)).join("")}</div><button class="submit" onclick="alert('Choix enregistrés pour ${title}.')">ENREGISTRER MES QUALIFIÉS</button></div><div class="card crystal"><h2>Boule de cristal</h2><p class="sub">Prédictions du round.</p>${crystal()}</div></div>`;
+      }
+      function render() {
+        document.getElementById("groups").innerHTML = Object.entries(groups)
+          .map(([n, g]) => `<div class="group"><h3>GROUPE ${n}</h3>${g.teams.map((t, i) => `<div class="match"><b>MATCH ${i + 1} · ${t[0]} vs ${t[1]}</b><span>Vainqueur : ${g.winners[i]}</span></div>`).join("")}</div>`)
+          .join("");
+        document.getElementById("cross").innerHTML = roundHTML("cross", "CROSS PLAY DECIDER");
+        document.getElementById("r1").innerHTML = roundHTML("r1", "ROUND 1");
+        document.getElementById("r2").innerHTML = roundHTML("r2", "ROUND 2");
+        document.getElementById("r3").innerHTML = roundHTML("r3", "ROUND 3");
+        document.getElementById("finalPick").innerHTML = q("ÉQUIPE CHAMPIONNE", teams);
+        document.getElementById("finalCrystal").innerHTML = crystal() + q("PENTAKILL EN FINALE", players) + q("CHAMPION LE PLUS JOUÉ", champs);
+        document.getElementById("ranking").innerHTML = ranking.map((x, i) => `<tr><td class="rank">${i + 1}</td><td>${x[0]}</td><td class="score">${x[1]}</td><td>—</td><td>—</td><td class="score">${x[1]}</td></tr>`).join("");
+        renderAdmin();
+      }
+      function choose(k, x) {
+        selection[k] = x;
+        localStorage.setItem("kcSelection", JSON.stringify(selection));
+        render();
+      }
+      function renderAdmin() {
+        document.getElementById("adminForms").innerHTML = Object.entries(bracket)
+          .map(
+            ([key, arr]) =>
+              `<h3>${key.toUpperCase()}</h3>` +
+              arr
+                .map(
+                  (t, i) =>
+                    `<div class="adminrow"><select data-k="${key}" data-i="${i}" data-s="0">${opts(teams.concat(["À DÉTERMINER"]).map((x) => (x === t[0] ? x + " ✓" : x)))}</select><select data-k="${key}" data-i="${i}" data-s="1">${opts(teams.concat(["À DÉTERMINER"]).map((x) => (x === t[1] ? x + " ✓" : x)))}</select></div>`,
+                )
+                .join(""),
+          )
+          .join("");
+      }
+      function applyAdmin() {
+        document.querySelectorAll("[data-k]").forEach((s) => {
+          let v = s.value.replace(" ✓", "");
+          bracket[s.dataset.k][Number(s.dataset.i)][Number(s.dataset.s)] = v;
+        });
+        localStorage.setItem("kcBracket", JSON.stringify(bracket));
+        render();
+        alert("Bracket mis à jour.");
+      }
+      function resetBracket() {
+        localStorage.removeItem("kcBracket");
+        location.reload();
+      }
+      document.querySelectorAll(".nav button[data-page]").forEach(
+        (b) =>
+          (b.onclick = () => {
+            document.querySelectorAll(".nav button").forEach((x) => x.classList.remove("active"));
+            b.classList.add("active");
+            document.querySelectorAll(".page").forEach((x) => x.classList.add("hidden"));
+            document.getElementById(b.dataset.page).classList.remove("hidden");
+          }),
+      );
+      document.querySelectorAll(".roundnav button").forEach(
+        (b) =>
+          (b.onclick = () => {
+            document.querySelectorAll(".roundnav button").forEach((x) => x.classList.remove("active"));
+            b.classList.add("active");
+            document.querySelectorAll(".round").forEach((x) => x.classList.add("hidden"));
+            document.getElementById(b.dataset.round).classList.remove("hidden");
+          }),
+      );
+      document.getElementById("login").onclick = () => {
+        user = { id: ADMIN_DISCORD_ID };
+        document.getElementById("adminNav").style.display = "block";
+      };
+      document.getElementById("loginSide").onclick = () => {
+        user = { id: ADMIN_DISCORD_ID };
+        document.getElementById("adminNav").style.display = "block";
+      };
+      render();
+      document.getElementById("adminNav").style.display = "none";
+    </script>
+  </body>
+</html>
