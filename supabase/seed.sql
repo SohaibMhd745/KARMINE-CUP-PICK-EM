@@ -216,22 +216,20 @@ on conflict (ign) do nothing;
 -- ---------------------------------------------------------------------
 
 insert into legacy_scores (alias, group_points) values
-  ('Sohalia', 8), ('[Kancel Team] Florian', 8), ('[Wall Breakers] Z3RO', 8),
-  ('Sluje', 7), ('Mahyster', 6), ('rwby', 6),
-  ('Aynashaa', 5), ('HappyDridri', 5),
-  ('Ashway', 4), ('Basil', 4), ('Shige', 4), ('Termidi', 4), ('solartum', 4),
-  ('4Fingers', 3), ('Aekiro', 3), ('Mori', 3), ('Ofzebendo', 3), ('Pablo', 3),
-  ('[Dest. Capacity] Neptunew', 3), ('[GOONING] Lowan', 3), ('[KDAVRE CORP] Denis', 3),
-  ('Alan ☀', 2), ('Birouf', 2), ('Jpremy', 2), ('KC Keria', 2), ('LowResse', 2),
-  ('Rayou', 2), ('ZEUB Camthalion', 2), ('Zackk', 2), ('[KDAVRE CORP] Souheyl', 2),
-  ('[Kadavre Corp] Deleo', 2), ('[ZEUB] Sadaps_', 2),
-  ('Dest3ye', 1), ('Hedro', 1), ('Izuna', 1), ('Lornyk', 1), ('Oscar', 1),
-  ('Pauシ', 1), ('Yngvar', 1), ('Zeclipses', 1), ('[Feet&Fun] Lennarel', 1),
-  ('[Feet&Fun] Xofyx', 1), ('[Full Trust] XaleCl', 1), ('[GOONING] Lornyk', 1),
-  ('Eagle', 0), ('Frix', 0), ('Gahann', 0), ('Hatim', 0), ('Hichem', 0),
-  ('Lefwan', 0), ('Pau2', 0), ('ROI DES GWERS', 0), ('Shinox', 0),
-  ('[Feet&Fun] Blueiix', 0), ('[Feet&Fun]Pauシ', 0), ('[ZEUB] Gahann', 0),
-  ('ju', 0), ('魔', 0)
+  ('[Wall Breakers] Z3RO', 11), ('Sohalia', 11), ('[Kancel Team] Florian', 10), ('rwby', 9), ('Sluje', 9),
+  ('Basil', 7), ('Mahyster', 7), ('solartum', 7), ('Aekiro', 6), ('Aynashaa', 6),
+  ('Shige', 6), ('[Dest. Capacity] Neptunew', 5), ('[GOONING] Lowan', 5), ('HappyDridri', 5), ('LowResse', 5),
+  ('Mori', 5), ('Ofzebendo', 5), ('Termidi', 5), ('4Fingers', 4), ('[KDAVRE CORP] Denis', 4),
+  ('[KDAVRE CORP] Souheyl', 4), ('Ashway', 4), ('Birouf', 4), ('Pablo', 4), ('Rayou', 4),
+  ('[Kadavre Corp] Deleo', 3), ('[ZEUB] Sadaps_', 3), ('Alan ☀', 3), ('Dest3ye', 3), ('KC Keria', 3),
+  ('Panini Knacki', 3), ('[Feet&Fun] Blueiix', 2), ('[Feet&Fun] Lennarel', 2), ('[Full Trust] XaleCl', 2), ('[GOONING] Lornyk', 2),
+  ('Frix', 2), ('Hedro', 2), ('Jpremy', 2), ('maydi', 2), ('muzeyyi', 2),
+  ('Yngvar', 2), ('Zackk', 2), ('ZEUB Camthalion', 2), ('[Feet&Fun] Xofyx', 1), ('[Feet&Fun]Pauシ', 1),
+  ('[ZEUB] Gahann', 1), ('Izuna', 1), ('Le Loup Malicieux AHOUUU', 1), ('Lefwan', 1), ('Lornyk', 1),
+  ('Oscar', 1), ('Pauシ', 1), ('ROI DES GWERS', 1), ('Zeclipses', 1), ('Eagle', 0),
+  ('Gahann', 0), ('Hatim', 0), ('Hichem', 0), ('ju', 0), ('Pau2', 0),
+  ('Shinox', 0), ('魔', 0)
+
 on conflict (alias) do update set group_points = excluded.group_points;
 
 -- ---------------------------------------------------------------------
